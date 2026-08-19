@@ -1,58 +1,109 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Multi-Tenant Task Tracker
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A modular monolithic task management module built with **Laravel, Inertia.js, React, TypeScript, Tailwind CSS, and Pest PHP**, designed around strict company-level tenant isolation and a clean, icon-free Shadcn UI.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Full CRUD Operations**: Create, view, edit, and delete company tasks with title, description, status, priority, and due date.
+- **Strict Multi-Tenant Isolation**: 3-layer defensive authorization ensuring users cannot view, query, or mutate tasks belonging to other companies.
+- **Inertia.js Monolithic Flow**: Server-driven state delivering strongly typed props directly to React components without REST/CORS boilerplate.
+- **Clean & Modern UI**: Built with **Shadcn UI** components, Google Font **Manrope**, metric summary cards, and clean typography with zero icons and emojis.
+- **Automated Pest PHP Tests**: Comprehensive test suite verifying multi-tenant isolation boundaries and complete CRUD lifecycle.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Tech Stack
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Backend**: PHP 8.2+, Laravel 11/12/13, SQLite
+- **Frontend**: React 18, TypeScript, Inertia.js, Tailwind CSS, Shadcn UI
+- **Typography**: Google Fonts (Manrope)
+- **Testing**: Pest PHP
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+---
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## How to Run Locally
 
-## Agentic Development
+### Prerequisites
+- PHP 8.2+
+- Composer
+- Node.js 18+ & NPM
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### Setup Steps
 
 ```bash
-composer require laravel/boost --dev
+# 1. Install dependencies
+composer install
+npm install --legacy-peer-deps
 
-php artisan boost:install
+# 2. Environment configuration
+cp .env.example .env
+php artisan key:generate
+
+# 3. Migrate and Seed Demo Tenants
+php artisan migrate --seed
+
+# 4. Build frontend assets
+npm run build
+
+# 5. Start dev servers (in separate terminals)
+php artisan serve
+npm run dev
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+The application will be accessible at: **`http://localhost:8000`**
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Demo Credentials
 
-## Code of Conduct
+The database seeder provisions two isolated company tenants with ready-to-test accounts:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Company Tenant | Email | Password | Scope |
+|---|---|---|---|
+| **Acme Corp** | `alex@acme.com` | `password` | Tenant A Tasks |
+| **Globex Inc** | `sarah@globex.com` | `password` | Tenant B Tasks |
 
-## Security Vulnerabilities
+Log in as `alex@acme.com` to manage Acme Corp's tasks. Log in as `sarah@globex.com` to confirm that Acme Corp's tasks are completely isolated and unreachable.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+## Running Automated Tests
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Run the Pest PHP test suite to verify tenant security and CRUD features:
+
+```bash
+php artisan test
+```
+
+---
+
+## Architectural Decisions
+
+1. **Monolith with Inertia.js over REST SPA**:
+   - The frontend and backend live in a unified repository. Inertia eliminates boilerplate REST endpoints, duplicate route definitions, and client-side token management while retaining server-side session authentication and CSRF protection.
+
+2. **3-Layer Defensive Tenancy Architecture**:
+   - **Layer 1 (Controller Query Scope)**: All task queries explicitly chain `Task::forCompany($companyId)`.
+   - **Layer 2 (Policy Authorization)**: `TaskPolicy` validates `$user->company_id === $task->company_id` on every action.
+   - **Layer 3 (Form Request Sanitization & Injection)**: `StoreTaskRequest` automatically injects `$request->user()->company_id` directly from the authenticated session, preventing foreign tenant ID spoofing in the client payload.
+
+3. **Composite Database Indexing**:
+   - The `tasks` table includes a composite index on `['company_id', 'status', 'created_at']` for optimal tenant-scoped query and filter performance.
+
+4. **Clean, Text-First UI**:
+   - Built with Shadcn UI components styled with neutral tones and Google Font Manrope. Avoids visual clutter by using clean text labels and pill badges instead of icons or emojis.
+
+---
+
+## AI Tools Used & Reflection
+
+### Tools Used
+- **Antigravity / Cursor / Claude**: Used for rapid boilerplate scaffolding, migrations, Shadcn UI setup, and initial Pest test skeletons.
+
+### Engineering Reflection: Tenant Safety in Form Requests
+When scaffolding the `TaskController@store` method, standard boilerplate often generates un-scoped `Task::create($request->all())` and passes `company_id` via a hidden input on the client form.
+
+- **Risk Identified**: Passing `company_id` in the client request payload exposes a vulnerability where a malicious user could tamper with the request body to create tasks under a foreign company.
+- **Resolution**: Removed `company_id` from the client request payload entirely. Implemented a `tenantData()` helper method on `StoreTaskRequest` that securely injects the tenant ID from the trusted session (`$this->user()->company_id`).
